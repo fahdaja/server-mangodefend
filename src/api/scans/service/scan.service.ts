@@ -20,62 +20,85 @@ export class ScanService {
     dto: CreateScanDto,
     actualFileCount: number,
     actualMalwareCount: number,
-  ): {
-    totalFilesScanned: number;
-    totalMalwareDetected: number;
-  } {
-    const isUploadFile = dto.scanType === ScanType.UPLOAD_FILE;
-    // UPLOAD_FILE: override dengan nilai aktual dari file yang benar-benar diterima
-    if (isUploadFile) {
-      if (actualFileCount !== 1) {
-        throw new BadRequestException(
-          `File yang diupload tidak boleh lebih dari 1.`,
-        );
-      }
-
-      if (actualFileCount !== dto.totalFiles) {
-        throw new BadRequestException(
-          `File yang diupload (${actualFileCount}) tidak sesuai dengan total files yang dilaporkan (${dto.totalFiles}).`,
-        );
-      }
-      if (dto.totalMalware !== undefined && dto.totalMalware !== 1)
-        throw new BadRequestException(
-          `total malware tidak boleh lebih dari total files. `,
-        );
-
-      return {
-        totalFilesScanned: actualFileCount,
-        totalMalwareDetected: actualMalwareCount,
-      };
+  ): { totalFilesScanned: number; totalMalwareDetected: number } {
+    if (dto.scanType === ScanType.UPLOAD_FILE) {
+      return this.validateUploadFileScan(
+        dto,
+        actualFileCount,
+        actualMalwareCount,
+      );
     }
 
-    // FULL_SCAN: validasi hard-rule sebelum mempercayai data dari Desktop
+    return this.validateFullScan(dto, actualFileCount, actualMalwareCount);
+  }
+
+  /**
+   * Validasi khusus untuk single file upload
+   */
+  private validateUploadFileScan(
+    dto: CreateScanDto,
+    actualFileCount: number,
+    actualMalwareCount: number,
+  ) {
+    if (actualFileCount !== 1) {
+      throw new BadRequestException('File yang diupload harus tepat 1.');
+    }
+
+    if (dto.totalFiles !== 1) {
+      throw new BadRequestException(
+        `File yang diupload (1) tidak sesuai dengan total files yang dilaporkan (${dto.totalFiles}).`,
+      );
+    }
+
+    if (dto.totalMalware !== undefined && dto.totalMalware !== 1) {
+      throw new BadRequestException(
+        'Total malware tidak boleh lebih dari total files.',
+      );
+    }
+
+    return {
+      totalFilesScanned: actualFileCount,
+      totalMalwareDetected: actualMalwareCount,
+    };
+  }
+
+  /**
+   * Validasi khusus untuk full scan dari desktop aplikasi
+   */
+  private validateFullScan(
+    dto: CreateScanDto,
+    actualFileCount: number,
+    actualMalwareCount: number,
+  ) {
     const reportedMalware = dto.totalMalware ?? 0;
     const totalFiles = dto.totalFiles;
 
-    if (reportedMalware > totalFiles)
+    if (reportedMalware > totalFiles) {
       throw new BadRequestException(
-        `total malware (${reportedMalware}) tidak boleh lebih besar dari total files (${totalFiles}).`,
+        `Total malware (${reportedMalware}) tidak boleh lebih besar dari total files (${totalFiles}).`,
       );
+    }
 
-    if (totalFiles > actualFileCount)
+    if (totalFiles > actualFileCount) {
       throw new BadRequestException(
-        `total files (${totalFiles}) tidak boleh lebih besar dari file yang diupload (${actualFileCount}).`,
+        `Total files (${totalFiles}) tidak boleh lebih besar dari file yang diupload (${actualFileCount}).`,
       );
+    }
 
-    // Jika file yang diupload adalah malware, jumlahnya harus cocok dengan totalMalware
+    // Validasi sinkronisasi file malware fisik vs laporan
     if (
       actualMalwareCount > 0 &&
       dto.totalMalware !== undefined &&
       actualFileCount !== reportedMalware
-    )
+    ) {
       throw new BadRequestException(
         `File malware yang diupload (${actualFileCount}) tidak sesuai dengan totalMalware yang dilaporkan (${reportedMalware}).`,
       );
+    }
 
     return {
-      totalFilesScanned: dto.totalFiles,
-      totalMalwareDetected: reportedMalware,
+      totalFilesScanned: totalFiles,
+      totalMalwareDetected: actualMalwareCount,
     };
   }
 
