@@ -41,9 +41,10 @@ export class SubscriptionService {
     }
 
     async findAllPlans(): Promise<Plans[]> {
-        return await this.planRepository.find({
-            relations: ['model']
+        const plansData = await this.planRepository.find({
+            relations: ['model'],
         });
+        return Object.values(plansData);
     }
 
     // buat data user yang melakukan subscription berdasarkan plan yang dipilih
@@ -105,5 +106,47 @@ export class SubscriptionService {
 
             return await this.subscriptionRepository.save(subscription);
         }
+    }
+    
+   async updatePlan(id: number, data: Partial<CreatePlanDto>): Promise<Plans> {
+        // 1. Cek apakah plan-nya ada
+        const plan = await this.planRepository.findOne({ where: { id } });
+        if (!plan) {
+            throw new NotFoundException(`Plan dengan ID ${id} tidak ditemukan`);
+        }
+
+        // 2. Gunakan Object.assign atau preload untuk update
+        const updatedPlan = Object.assign(plan, data);
+        
+        // 3. Simpan dan kembalikan data yang sudah berubah
+        return await this.planRepository.save(updatedPlan);
+    }
+
+    async deletePlan(id: number): Promise<any> {
+        // 1. Cari plan-nya dulu
+        const plan = await this.planRepository.findOne({ where: { id } });
+        if (!plan) {
+            throw new NotFoundException(`Plan dengan ID ${id} tidak ditemukan`);
+        }
+
+        // 2. Cek apakah ada user yang sudah terlanjur berlangganan plan ini
+        const subscriptionCount = await this.subscriptionRepository.count({ 
+            where: { plan_id: id } 
+        });
+
+        if (subscriptionCount > 0) {
+            // Jika ada relasi, lempar BadRequest (Jangan asal hapus data sejarah)
+            throw new BadRequestException(
+                `Gagal hapus! Plan ini masih digunakan oleh ${subscriptionCount} data langganan user.`
+            );
+        }
+
+        // 3. Jika benar-benar bersih, baru delete
+        await this.planRepository.delete(id);
+        
+        return {
+            status: 'success',
+            message: 'Plan berhasil dihapus'
+        };
     }
 }

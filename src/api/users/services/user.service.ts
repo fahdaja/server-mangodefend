@@ -1,85 +1,174 @@
-  import { Injectable, BadRequestException, ConflictException, HttpStatus } from "@nestjs/common";
-  import { InjectRepository } from "@nestjs/typeorm";
-  import { User, Device } from "../entity/user.entity";
-  import { Repository } from "typeorm";
-  import { BcryptService } from "../../../common/hash/bcrypt.service";
-  import { CreateUserDto } from "../dto/user.dto";
-  import { application_type, os_type } from "../enum/devices.enum";
+import {
+  Injectable,
+  BadRequestException,
+  ConflictException,
+  HttpStatus,
+} from '@nestjs/common';
+import { InjectRepository } from '@nestjs/typeorm';
+import { User, Device } from '../entity/user.entity';
+import { Repository } from 'typeorm';
+import { BcryptService } from '../../../common/hash/bcrypt.service';
+import { CreateUserDto } from '../dto/user.dto';
+import { application_type, os_type } from '../enum/devices.enum';
 
+@Injectable()
+export class UserService {
+  constructor(
+    @InjectRepository(User) private readonly userRepository: Repository<User>,
+    @InjectRepository(Device)
+    private readonly deviceRepository: Repository<Device>,
+    private readonly bcryptService: BcryptService,
+  ) {}
 
-  @Injectable()
-  export class UserService {
-      constructor(
-          @InjectRepository(User) private readonly userRepository: Repository<User>, 
-          @InjectRepository(Device) private readonly deviceRepository: Repository<Device>,
-          private readonly bcryptService: BcryptService
-          ) {}
+  async findAll(search?: string, page: number = 1, limit: number = 10) {
+    const queryBuilder = this.userRepository.createQueryBuilder('user');
 
-    async createUser(createUserDto: CreateUserDto,): Promise<User> {
-        const existingUser = await this.userRepository.findOne({ where: { email: createUserDto.email } });
-        if (existingUser) {
-          throw new ConflictException('Email already exists');
-        }
-        const newUser = this.userRepository.create(createUserDto);
-        newUser.password = await this.bcryptService.hashPassword(createUserDto.password);
-        return await this.userRepository.save(newUser);
-      }
-      
-      async recordUserDevice(
-      userId: number, 
-      deviceData: { 
-          hardware_id: string; 
-          hostname: string; 
-          os_type: os_type; 
-          app_type: application_type, 
-          last_login: Date | null,
-          last_active: Date | null,
-          is_active: boolean 
-      }
+    queryBuilder
+      .leftJoin('user.devices', 'device')
+      .leftJoin('user.subscriptions', 'subscription')
+      .select([
+        'user.id AS id',
+        'user.email AS email',
+        'user.role AS role',
+        'user.createdAt AS "createdAt"',
+      ])
+      .addSelect('COUNT(DISTINCT device.id)', 'deviceCount')
+      .addSelect('COUNT(DISTINCT subscription.id)', 'subCount')
+      .groupBy('user.id')
+      .addGroupBy('user.email')
+      .addGroupBy('user.role')
+      .addGroupBy('user.createdAt');
+
+    if (search) {
+      queryBuilder.andWhere(
+        // PERBAIKAN: Gunakan kutip ganda pada "user" karena itu reserved keyword
+        '("user".email ILIKE :search OR "user".role::text ILIKE :search)',
+        { search: `%${search}%` },
+      );
+    }
+
+    queryBuilder
+      // PERBAIKAN: Gunakan kutip ganda pada "user" di orderBy juga
+      .orderBy('"user"."createdAt"', 'DESC')
+      .offset((page - 1) * limit)
+      .limit(limit);
+
+    const rawResults = await queryBuilder.getRawMany();
+
+    // Hitung total untuk pagination (Jangan lupa kutipnya juga di sini)
+    const countQuery = this.userRepository.createQueryBuilder('user');
+    if (search) {
+      countQuery.andWhere(
+        '("user".email ILIKE :search OR "user".role::text ILIKE :search)',
+        { search: `%${search}%` },
+      );
+    }
+    const total = await countQuery.getCount();
+
+    const data = rawResults.map((res) => ({
+      id: res.id,
+      email: res.email,
+      role: res.role,
+      createdAt: res.createdAt,
+      devices: { length: parseInt(res.deviceCount) || 0 },
+      subscriptions: { length: parseInt(res.subCount) || 0 },
+    }));
+
+    return {
+      data,
+      meta: { total, page, lastPage: Math.ceil(total / limit) },
+    };
+  }
+
+  /**
+   * Hitung total user, admin, dan client dalam 1x panggil database
+   */
+  async getDashboardStats() {
+    const stats = await this.userRepository
+      .createQueryBuilder('user')
+      .select('COUNT(user.id)', 'total')
+      .addSelect("COUNT(CASE WHEN user.role = 'admin' THEN 1 END)", 'admins')
+      .addSelect("COUNT(CASE WHEN user.role = 'client' THEN 1 END)", 'clients')
+      .getRawOne();
+
+    return {
+      total: parseInt(stats.total),
+      admins: parseInt(stats.admins),
+      clients: parseInt(stats.clients),
+    };
+  }
+
+  async createUser(createUserDto: CreateUserDto): Promise<User> {
+    const existingUser = await this.userRepository.findOne({
+      where: { email: createUserDto.email },
+    });
+    if (existingUser) {
+      throw new ConflictException('Email already exists');
+    }
+    const newUser = this.userRepository.create(createUserDto);
+    newUser.password = await this.bcryptService.hashPassword(
+      createUserDto.password,
+    );
+    return await this.userRepository.save(newUser);
+  }
+
+  async recordUserDevice(
+    userId: number,
+    deviceData: {
+      hardware_id: string;
+      hostname: string;
+      os_type: os_type;
+      app_type: application_type;
+      last_login: Date | null;
+      last_active: Date | null;
+      is_active: boolean;
+    },
   ): Promise<Device> {
-      const existingDevice = await this.deviceRepository.findOne({ 
-          where: { user_id: userId, hardware_id: deviceData.hardware_id } 
-      });
+    const existingDevice = await this.deviceRepository.findOne({
+      where: { user_id: userId, hardware_id: deviceData.hardware_id },
+    });
 
-      const now = new Date();
+    const now = new Date();
 
-      if (existingDevice) {
-          Object.assign(existingDevice, deviceData);
+    if (existingDevice) {
+      Object.assign(existingDevice, deviceData);
 
-          if (deviceData.is_active === true) {
-              existingDevice.last_login = now;
-          } else {
-              existingDevice.last_active = now;
-          }
-
-          return await this.deviceRepository.save(existingDevice);
+      if (deviceData.is_active === true) {
+        existingDevice.last_login = now;
       } else {
-          const newDevice = this.deviceRepository.create({ 
-              ...deviceData, 
-              user_id: userId,
-              last_login: now, 
-              last_active: null 
-          });
-          return await this.deviceRepository.save(newDevice);
+        existingDevice.last_active = now;
       }
-  }
 
-  async findAll() {
-      return await this.userRepository.find({
-        relations: ['devices', 'subscriptions', 'subscriptions.plan'],
-        order: { createdAt: 'DESC' }
+      return await this.deviceRepository.save(existingDevice);
+    } else {
+      const newDevice = this.deviceRepository.create({
+        ...deviceData,
+        user_id: userId,
+        last_login: now,
+        last_active: null,
       });
-    }
-
-    async findDevice( userId: number, hardwareId: string): Promise<Device | null> {
-      return await this.deviceRepository.findOne({ where: { user_id: userId, hardware_id: hardwareId } });
-    }
-    
-    async findByEmail(email: string): Promise<User | null> {
-      return await this.userRepository.findOne({ where: { email } });
-    }
-
-    async findById(id: number): Promise<User | null> {
-      return await this.userRepository.findOne({ where: { id } });
+      return await this.deviceRepository.save(newDevice);
     }
   }
+
+  async findUserDevices(userId: number) {
+    return await this.deviceRepository.find({
+      where: { user_id: userId },
+      order: { last_login: 'DESC' },
+    });
+  }
+
+  async findDevice(userId: number, hardwareId: string): Promise<Device | null> {
+    return await this.deviceRepository.findOne({
+      where: { user_id: userId, hardware_id: hardwareId },
+    });
+  }
+
+  async findByEmail(email: string): Promise<User | null> {
+    return await this.userRepository.findOne({ where: { email } });
+  }
+
+  async findById(id: number): Promise<User | null> {
+    return await this.userRepository.findOne({ where: { id } });
+  }
+}

@@ -2,6 +2,10 @@ import { IsEnum, IsNotEmpty, IsNumber, IsOptional, IsString } from "class-valida
 import { PlanType } from "../enum/plan.enum";
 
 export class CreatePlanDto {
+    @IsNumber()
+    @IsOptional()
+    id?: number;
+
     @IsOptional()
     @IsNumber()
     user_id?: number;
@@ -22,7 +26,7 @@ export class CreatePlanDto {
     @IsNumber()
     durationDays!: number;
 
-    @IsOptional()
+    @IsNotEmpty()
     @IsNumber()
-    model_id?: number;
+    model_id!: number;
 }

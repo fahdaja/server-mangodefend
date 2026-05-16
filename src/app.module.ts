@@ -8,6 +8,8 @@ import { TransactionModule } from './api/transactions/transaction.module';
 import { MlModule } from './api/ML/ml.module';
 import { HashModule } from './common/hash/hash.module';
 
+import { ScanModule } from './api/scans/scan.module';
+
 @Module({
   imports: [ConfigModule.forRoot({
     isGlobal: true, 
@@ -23,7 +25,7 @@ import { HashModule } from './common/hash/hash.module';
       synchronize: true,
     }),
   }),
-    HashModule, UserModule, AuthModule, SubscriptionModule, TransactionModule, MlModule
+    HashModule, UserModule, AuthModule, SubscriptionModule, TransactionModule, MlModule, ScanModule
   ],
 })
 export class AppModule {}

@@ -1,4 +1,4 @@
-import { Controller, Get, Post, Body, Param, ParseIntPipe, Patch, UseGuards } from '@nestjs/common';
+import { Controller, Get, Post, Body, Param, ParseIntPipe, Patch, UseGuards, Delete } from '@nestjs/common';
 import { MlService } from '../services/ml.service';
 import { CreateMlModelDto } from '../dto/create-ml.dto';
 import { AuthGuard } from '../../auth/guards/auth.guard';
@@ -29,5 +29,13 @@ export class MlController {
     @Patch(':id/status')
     async toggleModelStatus(@Param('id', ParseIntPipe) id: number, @Body('is_active') is_active: boolean) {
         return this.mlService.toggleModelStatus(id, is_active);
+    }
+    
+
+    @UseGuards(AuthGuard, RoleGuard)
+    @Roles(Role.ADMIN)
+    @Delete(':id')
+    async deleteModel(@Param('id', ParseIntPipe) id: number) {
+        return this.mlService.deleteModel(id);
     }
 }

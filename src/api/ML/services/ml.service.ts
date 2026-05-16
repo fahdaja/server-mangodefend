@@ -40,6 +40,9 @@ export class MlService {
         if (!model) {
             throw new NotFoundException('Model not found');
         }
+        if(is_active){
+            await this.mlModelRepository.update({},{is_active: false});
+        }
 
         model.is_active = is_active;
         await this.mlModelRepository.save(model);
@@ -47,6 +50,21 @@ export class MlService {
         return {
             status: 'success',
             message: `Model status updated to ${is_active ? 'active' : 'inactive'}`,
+            data: model
+        };
+    }
+    
+    async deleteModel(id: number): Promise<any> {
+        const model = await this.mlModelRepository.findOne({ where: { id } });
+        if (!model) {
+            throw new NotFoundException('Model not found');
+        }
+
+        await this.mlModelRepository.remove(model);
+
+        return {
+            status: 'success',
+            message: 'Model deleted successfully',
             data: model
         };
     }

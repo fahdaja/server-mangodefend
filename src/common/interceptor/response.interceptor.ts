@@ -7,6 +7,10 @@ export class ResponseInterceptor implements NestInterceptor {
   intercept(context: ExecutionContext, next: CallHandler): Observable<any> {
     return next.handle().pipe(
       map(data => {
+
+        if (Array.isArray(data)) {
+          return data; 
+        }
         // Jika data sudah memiliki message, itu response sukses
         if (data && typeof data === 'object' && 'message' in data) {
           return {
@@ -14,9 +18,7 @@ export class ResponseInterceptor implements NestInterceptor {
           };
         }
         // Untuk response sukses lainnya, tambahkan success: true
-        return {
-          ...data,
-        };
+        return typeof data === 'object' ? { ...data } : data;
       }),
     );
   }
