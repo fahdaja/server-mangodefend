@@ -16,6 +16,7 @@ export class ScanService {
     private readonly supabaseService: SupabaseService,
   ) {}
 
+  // validasi total file scan dan malware
   private resolveScanTotals(
     dto: CreateScanDto,
     actualFileCount: number,
@@ -32,9 +33,7 @@ export class ScanService {
     return this.validateFullScan(dto, actualFileCount, actualMalwareCount);
   }
 
-  /**
-   * Validasi khusus untuk single file upload
-   */
+  // Validation khusus untuk single file upload
   private validateUploadFileScan(
     dto: CreateScanDto,
     actualFileCount: number,
@@ -62,9 +61,7 @@ export class ScanService {
     };
   }
 
-  /**
-   * Validasi khusus untuk full scan dari desktop aplikasi
-   */
+  // Validation khusus untuk full scan dari desktop aplikasi
   private validateFullScan(
     dto: CreateScanDto,
     actualFileCount: number,
@@ -102,6 +99,7 @@ export class ScanService {
     };
   }
 
+  // proses membuat history scan dan upload images ke supabase
   async createScanWithUpload(files: Express.Multer.File[], dto: CreateScanDto) {
     const isMalware = dto.isMalware ?? true;
     const folderName = isMalware ? 'malware' : 'benign';
