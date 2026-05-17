@@ -37,8 +37,19 @@ export class ScanController {
 
     const result = await this.scanService.createScanWithUpload(files, dto);
 
+    const { matched_from_library, new_uploads } = result.library_info;
+    let message: string;
+
+    if (matched_from_library > 0 && new_uploads === 0) {
+      message = `Scan selesai. ${matched_from_library} file sudah dikenal di library, tidak ada upload baru.`;
+    } else if (matched_from_library > 0 && new_uploads > 0) {
+      message = `Scan selesai. ${matched_from_library} file ditemukan di library, ${new_uploads} file baru diupload.`;
+    } else {
+      message = `Scan selesai. ${new_uploads} file baru berhasil diupload.`;
+    }
+
     return {
-      message: 'Scan created and files uploaded successfully',
+      message,
       data: result,
     };
   }

@@ -58,8 +58,14 @@ export class scan_details {
   @Column()
   file_name: string;
 
+  @Column({ nullable: true })
+  file_hash: string;
+
   @Column({ default: false })
   is_malware: boolean;
+
+  @Column({ default: false })
+  matched_in_library: boolean;
 
   @CreateDateColumn({ type: 'timestamp' })
   detected_at: Date;

@@ -26,8 +26,14 @@ export class SupabaseService {
   async uploadScanImage(
     file: Express.Multer.File,
     folderName: string = 'scans',
+    fileHash?: string,
   ): Promise<string> {
-    const fileName = `${Date.now()}-${file.originalname.replace(/\s/g, '-')}`;
+    // Gunakan hash sebagai nama file supaya path unik per konten
+    // Kalau hash tidak disediakan, fallback ke timestamp + nama original
+    const extension = file.originalname.split('.').pop() || 'bin';
+    const fileName = fileHash
+      ? `${fileHash}.${extension}`
+      : `${Date.now()}-${file.originalname.replace(/\s/g, '-')}`;
     const filePath = `${folderName}/${fileName}`;
 
     // Upload ke Supabase
@@ -39,6 +45,15 @@ export class SupabaseService {
       });
 
     if (error) {
+      // Jika file dengan path yang sama sudah ada (duplikat), skip upload
+      // dan langsung return public URL yang sudah ada
+      if (error.message?.includes('Duplicate') || error.message?.includes('already exists')) {
+        const { data: urlData } = this.supabase.storage
+          .from(this.bucketName)
+          .getPublicUrl(filePath);
+        return urlData.publicUrl;
+      }
+
       throw new InternalServerErrorException(
         'Gagal upload ke Supabase: ' + error.message,
       );

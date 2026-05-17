@@ -9,6 +9,7 @@ import { MlModule } from './api/ML/ml.module';
 import { HashModule } from './common/hash/hash.module';
 
 import { ScanModule } from './api/scans/scan.module';
+import { DatasetModule } from './api/dataset/dataset.module';
 
 @Module({
   imports: [ConfigModule.forRoot({
@@ -25,7 +26,7 @@ import { ScanModule } from './api/scans/scan.module';
       synchronize: true,
     }),
   }),
-    HashModule, UserModule, AuthModule, SubscriptionModule, TransactionModule, MlModule, ScanModule
+    HashModule, UserModule, AuthModule, SubscriptionModule, TransactionModule, MlModule, ScanModule, DatasetModule
   ],
 })
 export class AppModule {}
