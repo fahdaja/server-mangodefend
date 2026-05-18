@@ -10,6 +10,7 @@ import { Repository } from 'typeorm';
 import { BcryptService } from '../../../common/hash/bcrypt.service';
 import { CreateUserDto } from '../dto/user.dto';
 import { application_type, os_type } from '../enum/devices.enum';
+import { AuthProvider } from '../enum/auth-provider.enum';
 
 @Injectable()
 export class UserService {
@@ -170,5 +171,58 @@ export class UserService {
 
   async findById(id: number): Promise<User | null> {
     return await this.userRepository.findOne({ where: { id } });
+  }
+
+  async findByFirebaseUid(firebaseUid: string): Promise<User | null> {
+    return await this.userRepository.findOne({
+      where: { firebase_uid: firebaseUid },
+    });
+  }
+
+  /**
+   * Find user by Firebase UID or email, or create a new one.
+   * Used during Firebase OAuth login flow.
+   */
+  async findOrCreateFirebaseUser(data: {
+    firebase_uid: string;
+    email: string;
+    auth_provider: AuthProvider;
+    display_name?: string;
+    photo_url?: string;
+  }): Promise<{ user: User; isNewUser: boolean }> {
+    // 1. Cari berdasarkan firebase_uid dulu
+    let user = await this.findByFirebaseUid(data.firebase_uid);
+    if (user) {
+      // Update info terbaru dari Firebase
+      if (data.display_name) user.display_name = data.display_name;
+      if (data.photo_url) user.photo_url = data.photo_url;
+      await this.userRepository.save(user);
+      return { user, isNewUser: false };
+    }
+
+    // 2. Cari berdasarkan email (mungkin user sudah register manual sebelumnya)
+    user = await this.findByEmail(data.email);
+    if (user) {
+      // Link akun existing dengan Firebase
+      user.firebase_uid = data.firebase_uid;
+      user.auth_provider = data.auth_provider;
+      if (data.display_name && !user.display_name)
+        user.display_name = data.display_name;
+      if (data.photo_url && !user.photo_url) user.photo_url = data.photo_url;
+      await this.userRepository.save(user);
+      return { user, isNewUser: false };
+    }
+
+    // 3. Buat user baru
+    const newUser = this.userRepository.create({
+      email: data.email,
+      password: null,
+      firebase_uid: data.firebase_uid,
+      auth_provider: data.auth_provider,
+      display_name: data.display_name || null,
+      photo_url: data.photo_url || null,
+    });
+    const savedUser = await this.userRepository.save(newUser);
+    return { user: savedUser, isNewUser: true };
   }
 }

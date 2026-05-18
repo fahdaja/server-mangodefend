@@ -7,6 +7,7 @@ import { SubscriptionModule } from './api/subscriptions/subscription.module';
 import { TransactionModule } from './api/transactions/transaction.module';
 import { MlModule } from './api/ML/ml.module';
 import { HashModule } from './common/hash/hash.module';
+import { FirebaseModule } from './common/firebase/firebase.module';
 
 import { ScanModule } from './api/scans/scan.module';
 import { DatasetModule } from './api/dataset/dataset.module';
@@ -26,7 +27,7 @@ import { DatasetModule } from './api/dataset/dataset.module';
       synchronize: true,
     }),
   }),
-    HashModule, UserModule, AuthModule, SubscriptionModule, TransactionModule, MlModule, ScanModule, DatasetModule
+    HashModule, FirebaseModule, UserModule, AuthModule, SubscriptionModule, TransactionModule, MlModule, ScanModule, DatasetModule
   ],
 })
 export class AppModule {}

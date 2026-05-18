@@ -1,6 +1,7 @@
 import { BadRequestException, Body, Controller, HttpCode, Post, Req, UnauthorizedException, UseGuards } from "@nestjs/common";
 import { AuthService } from "../services/auth.service";
 import { LoginDto, SessionDevice, SignOutDto } from "../dto/auth.dto";
+import { FirebaseLoginDto } from "../dto/firebase-auth.dto";
 import { AuthGuard } from "../guards/auth.guard";
 
 
@@ -17,6 +18,17 @@ export class AuthController {
         
     return this.authService.signIn(loginData, deviceData);
 }
+
+    /**
+     * Firebase OAuth Login/Register
+     * Client mengirim Firebase ID Token setelah berhasil login via Google/GitHub di frontend.
+     * Backend verify token, find/create user, dan return internal JWT.
+     */
+    @Post("firebase-login")
+    @HttpCode(200)
+    async firebaseSignIn(@Body() firebaseLoginDto: FirebaseLoginDto) {
+        return this.authService.firebaseSignIn(firebaseLoginDto);
+    }
 
 @Post("logout")
 @UseGuards(AuthGuard)
